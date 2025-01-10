@@ -1,13 +1,10 @@
 package com.greatdayhr.plugin.securitycheck;
-
 import android.os.Build;
 import android.util.Log;
-
 import java.util.Objects;
 import java.io.File;
 
 public class SecurityCheck {
-
     private static final String[] GENY_FILES = {
             "/dev/socket/genyd",
             "/dev/socket/baseband_genyd"
@@ -54,6 +51,40 @@ public class SecurityCheck {
                 || checkFiles(PIPES));
     }
 
+    public boolean isRunningOnEmulator() {
+        boolean simpleCheck = (Build.MODEL.contains("Emulator")
+                || Build.MODEL.contains("Android SDK built for x86")
+                || Build.BOARD.equals("QC_Reference_Phone")
+                || Build.HOST.startsWith("Build")); // MSI App Player
+
+        boolean checkGenymotion = Build.MANUFACTURER.contains("Genymotion");
+        boolean checkGeneric = Build.FINGERPRINT.startsWith("generic") 
+                || (Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic"));
+        boolean checkGoogleSDK = Build.MODEL.contains("google_sdk") 
+                || "google_sdk".equals(Build.PRODUCT);
+        boolean checkSDKEmulator = ((Build.FINGERPRINT.startsWith("google/sdk_gphone")
+                && (Build.FINGERPRINT.endsWith(":user/release-keys")
+                || Build.FINGERPRINT.endsWith(":userdebug/dev-keys"))
+                && Build.MANUFACTURER.equals("Google")
+                && Build.PRODUCT.startsWith("sdk_gphone")
+                && Build.BRAND.equals("google")
+                && Build.MODEL.startsWith("sdk_gphone"))
+                || Build.FINGERPRINT.startsWith("generic")
+                || Build.MODEL.contains("google_sdk")
+                || Build.MODEL.contains("Emulator")
+                || Build.MODEL.contains("Android SDK built for x86")
+                || ("QC_Reference_Phone".equals(Build.BOARD) 
+                    && !Build.MANUFACTURER.equalsIgnoreCase("Xiaomi"))
+                || Build.MANUFACTURER.contains("Genymotion")
+                || Build.HOST.startsWith("Build")
+                || (Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic"))
+                || "google_sdk".equals(Build.PRODUCT));
+
+        boolean result = simpleCheck || checkGenymotion || checkGeneric || checkGoogleSDK || checkSDKEmulator;
+
+        return result;
+    }
+
     public Boolean isEmulationDetected() {
         Boolean emulator = (Build.MANUFACTURER.contains("Genymotion")
                 || Build.MODEL.contains("google_sdk")
@@ -71,7 +102,6 @@ public class SecurityCheck {
                 || Build.PRODUCT.toLowerCase().contains("nox")
                 || Build.BOARD.toLowerCase().contains("nox")
                 || (Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic")));
-        return emulator || checkEmulatorFiles();
+        return emulator || checkEmulatorFiles() || isRunningOnEmulator();
     }
-    
 }
