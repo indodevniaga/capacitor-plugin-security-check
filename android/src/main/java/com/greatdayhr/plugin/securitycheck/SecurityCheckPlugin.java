@@ -9,7 +9,13 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 @CapacitorPlugin(name = "SecurityCheck")
 public class SecurityCheckPlugin extends Plugin {
 
-    private SecurityCheck implementation = new SecurityCheck();
+    private SecurityCheck implementation;
+
+    @Override
+    public void load() {
+        // Inisialisasi dengan context saat plugin dimuat
+        implementation = new SecurityCheck(getContext());
+    }
 
     @PluginMethod
     public void isEmulationDetected(PluginCall call) {
@@ -18,3 +24,4 @@ public class SecurityCheckPlugin extends Plugin {
         call.resolve(ret);
     }
 }
+
