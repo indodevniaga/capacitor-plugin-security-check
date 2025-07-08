@@ -14,12 +14,6 @@ import java.util.Objects;
 
 public class SecurityCheck {
 
-    private final Context context;
-
-    public SecurityCheck(Context context) {
-        this.context = context;
-    }
-
     // Emulator indicators (paths)
     private static final String[] EMULATOR_FILES = {
             "/dev/socket/genyd",
