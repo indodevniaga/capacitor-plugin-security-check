@@ -6,40 +6,13 @@ import android.hardware.SensorManager;
 import android.os.Build;
 import android.provider.Settings;
 import android.telephony.TelephonyManager;
+
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.InputStreamReader;
 import java.util.Objects;
 
 public class SecurityCheck {
-    private static final String[] GENY_FILES = {
-            "/dev/socket/genyd",
-            "/dev/socket/baseband_genyd"
-    };
-    private static final String[] PIPES = {
-            "/dev/socket/qemud",
-            "/dev/qemu_pipe"
-    };
-    private static final String[] X86_FILES = {
-            "ueventd.android_x86.rc",
-            "x86.prop",
-            "ueventd.ttVM_x86.rc",
-            "init.ttVM_x86.rc",
-            "fstab.ttVM_x86",
-            "fstab.vbox86",
-            "init.vbox86.rc",
-            "ueventd.vbox86.rc"
-    };
-    private static final String[] ANDY_FILES = {
-            "fstab.andy",
-            "ueventd.andy.rc"
-    };
-    private static final String[] NOX_FILES = {
-            "fstab.nox",
-            "init.nox.rc",
-            "ueventd.nox.rc"
-    };
-    private static final String[] BLUE_STACKS_FILES = {
-            "/mnt/windows/BstSharedFolder"
-    };
 
     private final Context context;
 
@@ -47,9 +20,31 @@ public class SecurityCheck {
         this.context = context;
     }
 
-    public static boolean checkFiles(String[] targets) {
-        for (String pipe : targets) {
-            File file = new File(pipe);
+    // Emulator indicators (paths)
+    private static final String[] EMULATOR_FILES = {
+            "/dev/socket/genyd",
+            "/dev/socket/baseband_genyd",
+            "/dev/socket/qemud",
+            "/dev/qemu_pipe",
+            "/mnt/windows/BstSharedFolder",
+            "ueventd.android_x86.rc",
+            "x86.prop",
+            "ueventd.ttVM_x86.rc",
+            "init.ttVM_x86.rc",
+            "fstab.ttVM_x86",
+            "fstab.vbox86",
+            "init.vbox86.rc",
+            "ueventd.vbox86.rc",
+            "fstab.andy",
+            "ueventd.andy.rc",
+            "fstab.nox",
+            "init.nox.rc",
+            "ueventd.nox.rc"
+    };
+
+    private boolean checkEmulatorFiles() {
+        for (String path : EMULATOR_FILES) {
+            File file = new File(path);
             if (file.exists()) {
                 return true;
             }
@@ -57,41 +52,29 @@ public class SecurityCheck {
         return false;
     }
 
-    public static boolean checkEmulatorFiles() {
-        return (checkFiles(GENY_FILES)
-                || checkFiles(ANDY_FILES)
-                || checkFiles(NOX_FILES)
-                || checkFiles(X86_FILES)
-                || checkFiles(PIPES)
-                || checkFiles(BLUE_STACKS_FILES));
-    }
-
     private boolean checkBuildProperties() {
-        String[] emulatorIndicators = {
-                "generic", "unknown", "emulator", "sdk", "x86", "goldfish", "ranchu", "google_sdk"
+        String[] indicators = {
+                "generic", "unknown", "emulator", "sdk", "x86", "x86_64",
+                "goldfish", "ranchu", "google_sdk"
         };
 
-        String buildFingerprint = Build.FINGERPRINT.toLowerCase();
-        String model = Build.MODEL.toLowerCase();
-        String manufacturer = Build.MANUFACTURER.toLowerCase();
-        String brand = Build.BRAND.toLowerCase();
-        String device = Build.DEVICE.toLowerCase();
-        String product = Build.PRODUCT.toLowerCase();
-        String hardware = Build.HARDWARE.toLowerCase();
+        String[] props = {
+                Build.FINGERPRINT, Build.MODEL, Build.MANUFACTURER,
+                Build.BRAND, Build.DEVICE, Build.PRODUCT, Build.HARDWARE, Build.BOARD
+        };
 
-        for (String indicator : emulatorIndicators) {
-            if (buildFingerprint.contains(indicator) ||
-                model.contains(indicator) ||
-                manufacturer.contains(indicator) ||
-                brand.contains(indicator) ||
-                device.contains(indicator) ||
-                product.contains(indicator) ||
-                hardware.contains(indicator)) {
-                return true;
+        for (String prop : props) {
+            String lowerProp = prop != null ? prop.toLowerCase() : "";
+            for (String indicator : indicators) {
+                if (lowerProp.contains(indicator)) {
+                    return true;
+                }
             }
         }
 
-        return false;
+        // Extra checks
+        return (Build.BRAND != null && Build.BRAND.startsWith("generic") &&
+                Build.DEVICE != null && Build.DEVICE.startsWith("generic"));
     }
 
     private boolean checkTelephony() {
@@ -99,13 +82,12 @@ public class SecurityCheck {
             TelephonyManager tm = (TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE);
             if (tm == null) return true;
 
-            String networkOperator = tm.getNetworkOperatorName();
-            String simOperator = tm.getSimOperatorName();
+            String network = tm.getNetworkOperatorName();
+            String sim = tm.getSimOperatorName();
 
-            return (networkOperator == null || networkOperator.isEmpty() || networkOperator.equalsIgnoreCase("android")) ||
-                   (simOperator == null || simOperator.isEmpty() || simOperator.equalsIgnoreCase("android"));
+            return (network == null || network.isEmpty() || network.equalsIgnoreCase("android")) ||
+                   (sim == null || sim.isEmpty() || sim.equalsIgnoreCase("android"));
         } catch (SecurityException e) {
-            // Permission not granted, skip this check
             return false;
         }
     }
@@ -113,9 +95,7 @@ public class SecurityCheck {
     private boolean checkSensorCount() {
         SensorManager sm = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
         if (sm == null) return true;
-
-        int sensorCount = sm.getSensorList(Sensor.TYPE_ALL).size();
-        return sensorCount < 5; // Real devices typically have more than 5 sensors
+        return sm.getSensorList(Sensor.TYPE_ALL).size() < 5;
     }
 
     private boolean checkAndroidId() {
@@ -123,31 +103,35 @@ public class SecurityCheck {
         return androidId == null || androidId.length() < 10;
     }
 
-    public boolean isEmulationDetected() {
-        boolean emulatorProps = (
-                Build.MANUFACTURER.contains("Genymotion")
-                || Build.MODEL.contains("google_sdk")
-                || Build.MODEL.toLowerCase().contains("droid4x")
-                || Build.MODEL.contains("Emulator")
-                || Build.MODEL.contains("Android SDK built for x86")
-                || Objects.equals(Build.HARDWARE, "goldfish")
-                || Objects.equals(Build.HARDWARE, "vbox86")
-                || Build.HARDWARE.toLowerCase().contains("nox")
-                || Build.FINGERPRINT.startsWith("generic")
-                || Objects.equals(Build.PRODUCT, "sdk")
-                || Objects.equals(Build.PRODUCT, "google_sdk")
-                || Objects.equals(Build.PRODUCT, "sdk_x86")
-                || Objects.equals(Build.PRODUCT, "vbox86p")
-                || Build.PRODUCT.toLowerCase().contains("nox")
-                || Build.BOARD.toLowerCase().contains("nox")
-                || (Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic"))
-        );
+    private boolean isProbablyRunningOnEmulatorCpu() {
+        String arch = System.getProperty("os.arch");
+        return arch != null && (arch.contains("x86") || arch.contains("86_64"));
+    }
 
-        return emulatorProps
+    private boolean checkQemuProps() {
+        return "1".equals(getSystemProperty("ro.kernel.qemu")) ||
+               "1".equals(getSystemProperty("ro.boot.qemu"));
+    }
+
+    private String getSystemProperty(String name) {
+        try {
+            Process process = Runtime.getRuntime().exec("getprop " + name);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String result = reader.readLine();
+            reader.close();
+            return result != null ? result.trim() : "";
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    public boolean isEmulationDetected() {
+        return checkBuildProperties()
                 || checkEmulatorFiles()
-                || checkBuildProperties()
                 || checkTelephony()
                 || checkSensorCount()
-                || checkAndroidId();
+                || checkAndroidId()
+                || isProbablyRunningOnEmulatorCpu()
+                || checkQemuProps();
     }
 }
