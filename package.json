@@ -1,6 +1,6 @@
 {
   "name": "capacitor-plugin-security-check",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "description": "capacitor-plugin-security-check",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
