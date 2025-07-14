@@ -6,7 +6,6 @@ import android.hardware.SensorManager;
 import android.os.Build;
 import android.provider.Settings;
 import android.telephony.TelephonyManager;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
@@ -22,24 +21,24 @@ public class SecurityCheck {
 
     // Emulator indicators (paths)
     private static final String[] EMULATOR_FILES = {
-            "/dev/socket/genyd",
-            "/dev/socket/baseband_genyd",
-            "/dev/socket/qemud",
-            "/dev/qemu_pipe",
-            "/mnt/windows/BstSharedFolder",
-            "ueventd.android_x86.rc",
-            "x86.prop",
-            "ueventd.ttVM_x86.rc",
-            "init.ttVM_x86.rc",
-            "fstab.ttVM_x86",
-            "fstab.vbox86",
-            "init.vbox86.rc",
-            "ueventd.vbox86.rc",
-            "fstab.andy",
-            "ueventd.andy.rc",
-            "fstab.nox",
-            "init.nox.rc",
-            "ueventd.nox.rc"
+        "/dev/socket/genyd",
+        "/dev/socket/baseband_genyd",
+        "/dev/socket/qemud",
+        "/dev/qemu_pipe",
+        "/mnt/windows/BstSharedFolder",
+        "ueventd.android_x86.rc",
+        "x86.prop",
+        "ueventd.ttVM_x86.rc",
+        "init.ttVM_x86.rc",
+        "fstab.ttVM_x86",
+        "fstab.vbox86",
+        "init.vbox86.rc",
+        "ueventd.vbox86.rc",
+        "fstab.andy",
+        "ueventd.andy.rc",
+        "fstab.nox",
+        "init.nox.rc",
+        "ueventd.nox.rc"
     };
 
     private boolean checkEmulatorFiles() {
@@ -53,14 +52,17 @@ public class SecurityCheck {
     }
 
     private boolean checkBuildProperties() {
-        String[] indicators = {
-                "generic", "unknown", "emulator", "sdk", "x86", "x86_64",
-                "goldfish", "ranchu", "google_sdk"
-        };
+        String[] indicators = { "generic", "unknown", "emulator", "sdk", "x86", "x86_64", "goldfish", "ranchu", "google_sdk" };
 
         String[] props = {
-                Build.FINGERPRINT, Build.MODEL, Build.MANUFACTURER,
-                Build.BRAND, Build.DEVICE, Build.PRODUCT, Build.HARDWARE, Build.BOARD
+            Build.FINGERPRINT,
+            Build.MODEL,
+            Build.MANUFACTURER,
+            Build.BRAND,
+            Build.DEVICE,
+            Build.PRODUCT,
+            Build.HARDWARE,
+            Build.BOARD
         };
 
         for (String prop : props) {
@@ -73,20 +75,28 @@ public class SecurityCheck {
         }
 
         // Extra checks
-        return (Build.BRAND != null && Build.BRAND.startsWith("generic") &&
-                Build.DEVICE != null && Build.DEVICE.startsWith("generic"));
+        return (Build.BRAND != null && Build.BRAND.startsWith("generic") && Build.DEVICE != null && Build.DEVICE.startsWith("generic"));
     }
 
     private boolean checkTelephony() {
         try {
             TelephonyManager tm = (TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE);
-            if (tm == null) return true;
+            if (tm == null) {
+                return true; // Tidak bisa akses, curigakan
+            }
 
             String network = tm.getNetworkOperatorName();
             String sim = tm.getSimOperatorName();
 
-            return (network == null || network.isEmpty() || network.equalsIgnoreCase("android")) ||
-                   (sim == null || sim.isEmpty() || sim.equalsIgnoreCase("android"));
+            // Jika KEDUA-NYA kosong atau null → baru kita curigai
+            boolean suspicious = (network == null || network.trim().isEmpty()) && (sim == null || sim.trim().isEmpty());
+
+            // Tambahan: curiga juga jika salah satu bernama "android"
+            if ((network != null && network.equalsIgnoreCase("android")) || (sim != null && sim.equalsIgnoreCase("android"))) {
+                suspicious = true;
+            }
+
+            return suspicious;
         } catch (SecurityException e) {
             return false;
         }
@@ -109,8 +119,7 @@ public class SecurityCheck {
     }
 
     private boolean checkQemuProps() {
-        return "1".equals(getSystemProperty("ro.kernel.qemu")) ||
-               "1".equals(getSystemProperty("ro.boot.qemu"));
+        return "1".equals(getSystemProperty("ro.kernel.qemu")) || "1".equals(getSystemProperty("ro.boot.qemu"));
     }
 
     private String getSystemProperty(String name) {
@@ -126,12 +135,14 @@ public class SecurityCheck {
     }
 
     public boolean isEmulationDetected() {
-        return checkBuildProperties()
-                || checkEmulatorFiles()
-                || checkTelephony()
-                || checkSensorCount()
-                || checkAndroidId()
-                || isProbablyRunningOnEmulatorCpu()
-                || checkQemuProps();
+        return (
+            checkBuildProperties() ||
+            checkEmulatorFiles() ||
+            checkTelephony() ||
+            checkSensorCount() ||
+            checkAndroidId() ||
+            isProbablyRunningOnEmulatorCpu() ||
+            checkQemuProps()
+        );
     }
 }
