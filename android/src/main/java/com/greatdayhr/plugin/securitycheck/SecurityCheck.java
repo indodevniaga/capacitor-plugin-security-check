@@ -111,7 +111,17 @@ public class SecurityCheck {
   private boolean checkSensorCount() {
     SensorManager sm = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
     if (sm == null) return true;
-    return sm.getSensorList(Sensor.TYPE_ALL).size() < 5;
+
+    int count = sm.getSensorList(Sensor.TYPE_ALL).size();
+
+    // Emulator hampir selalu memiliki 0–1 sensor
+    if (count == 0) return true;
+
+    // Device nyata Android 7 ke bawah, jangan disalahkan
+    if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.N_MR1) return false;
+
+    // Device modern seharusnya punya minimal 2 sensor
+    return count < 2;
   }
 
   private boolean checkAndroidId() {
